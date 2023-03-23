@@ -1143,7 +1143,6 @@
     const followCamHeight = 4
     const followCamDistance = 6
     let cameraFollowRotation = 0
-    let toggleLookBehind = false
 
     let isControlLocked = true
 
@@ -1164,7 +1163,7 @@
       }
 
       if (event.key.toLowerCase() == 'r') {
-        toggleLookBehind = !toggleLookBehind
+        debugObject.isToggledLookingBehind = !debugObject.isToggledLookingBehind
       }
     }, false)
 
@@ -1248,17 +1247,7 @@
 
       if (isFollowingModel) {
         if (keysPressed[R]) {
-          const rotZ = Math.cos(cameraFollowRotation)
-          const rotX = Math.sin(cameraFollowRotation)
-          if (toggleLookBehind) {
-            camera.position.x = fox.position.x + (followCamDistance * rotX)
-            camera.position.y = fox.position.y + followCamHeight
-            camera.position.z = fox.position.z - (followCamDistance * rotZ)
-          } else {
-            camera.position.x = fox.position.x - (followCamDistance * rotX)
-            camera.position.y = fox.position.y + followCamHeight
-            camera.position.z = fox.position.z + (followCamDistance * rotZ)
-          }
+          setCameraFollowModelMode()
         }
       }
 
@@ -1303,18 +1292,7 @@
             } else if (keysPressed[D]) {
               cameraFollowRotation += rotateAng
             }
-            const rotZ = Math.cos(cameraFollowRotation)
-            const rotX = Math.sin(cameraFollowRotation)
-
-            if (toggleLookBehind) {
-              camera.position.x = fox.position.x + (followCamDistance * rotX)
-              camera.position.y = fox.position.y + followCamHeight
-              camera.position.z = fox.position.z - (followCamDistance * rotZ)
-            } else {
-              camera.position.x = fox.position.x - (followCamDistance * rotX)
-              camera.position.y = fox.position.y + followCamHeight
-              camera.position.z = fox.position.z + (followCamDistance * rotZ)
-            }
+            setCameraFollowModelMode()
           }
         }
       }
@@ -1415,6 +1393,21 @@
 
     let isFollowingModel = false
 
+    const setCameraFollowModelMode = () => {
+      if (fox) {
+        const rotZ = Math.cos(cameraFollowRotation)
+        const rotX = Math.sin(cameraFollowRotation)
+        if (debugObject.isToggledLookingBehind) {
+          camera.position.x = fox.position.x - (followCamDistance * rotX)
+          camera.position.z = fox.position.z + (followCamDistance * rotZ)
+        } else {
+          camera.position.x = fox.position.x + (followCamDistance * rotX)
+          camera.position.z = fox.position.z - (followCamDistance * rotZ)
+        }
+        camera.position.y = fox.position.y + followCamHeight
+      }
+    }
+
     const toggleFollowModel = (bool) => {
       if (bool) {
         isFollowingModel = true
@@ -1423,17 +1416,7 @@
         if (!isFollowingModelWithMouse)
           controls.enabled = false
 
-        if (fox) {
-          if (toggleLookBehind) {
-            camera.position.x = fox.position.x + (followCamDistance)
-            camera.position.y = fox.position.y + followCamHeight
-            camera.position.z = fox.position.z - (followCamDistance)
-          } else {
-            camera.position.x = fox.position.x - (followCamDistance)
-            camera.position.y = fox.position.y + followCamHeight
-            camera.position.z = fox.position.z + (followCamDistance)
-          }
-        }
+        setCameraFollowModelMode()
       } else {
         isFollowingModel = false
         debugObject.toggleFollowModel = false
@@ -1474,6 +1457,11 @@
     cameraFolder.add(debugObject, 'toggleFollowModelMouseMode')
       .onChange((value) => { toggleFollowModelMouseMode(value) })
       .name('Toggle mouse mode (in follow mode)')
+
+    debugObject.isToggledLookingBehind = false
+    cameraFolder.add(debugObject, 'isToggledLookingBehind')
+      .name('Look behind (follow model mode)')
+      .listen()
 
     debugObject.cameraFollowSensitivity = 1.5
     cameraFolder.add(debugObject, 'cameraFollowSensitivity')
