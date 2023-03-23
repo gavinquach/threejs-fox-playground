@@ -226,6 +226,33 @@
     const gui = new dat.GUI()
     const debugObject = {}
 
+    // Refresh rate
+    let isObservingPlanet = false
+    let observingObject = null
+    let observingObjectParams = null
+    const observePlanet = (planet) => {
+      cinematicView = false
+      isObservingPlanet = true
+      if (controlMode == 0) controls.reset()
+      observingObject = planet[0]
+      observingObjectParams = planet[1]
+    }
+
+    gui.add(debugObject, 'refreshRate', {
+        60: 60,
+        120: 120,
+        144: 144,
+        165: 165,
+        180: 180,
+        244: 244,
+        300: 300,
+        360: 360,
+        480: 480,
+        500: 500,
+      })
+      .name('Refresh Rate')
+      .setValue(60)
+
     const pos = 15
 
     const getRandomIntInclusive = (min, max) => {
@@ -1480,7 +1507,8 @@
       oldElapsedTime = elapsedTime
 
       // Update physics
-      world.step(1 / 120, deltaTime, 3)
+      world.step(1 / debugObject.refreshRate, deltaTime, 3)
+
       for (const obj of objectsToUpdate) {
         obj.mesh.position.copy(obj.body.position)
         obj.mesh.quaternion.copy(obj.body.quaternion)
