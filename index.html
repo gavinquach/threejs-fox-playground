@@ -224,6 +224,7 @@
      * Debug
      */
     const gui = new dat.GUI()
+    gui.close()
     const debugObject = {}
 
     // Refresh rate
@@ -355,6 +356,11 @@
 
           // unlock W A S D controls
           isControlLocked = false
+
+          // open debug menu 
+          window.setTimeout(() => {
+            gui.open()
+          }, 1000)
         }, 500)
       },
 
