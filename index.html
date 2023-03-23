@@ -1,0 +1,1536 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Self Project 1</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+    }
+
+    html,
+    body {
+      overflow: hidden;
+    }
+
+    .webgl {
+      position: fixed;
+      top: 0;
+      left: 0;
+      outline: none;
+    }
+
+    .loading-bar {
+      position: absolute;
+      top: 50%;
+      width: 100%;
+      height: 2px;
+      background: #ffffff;
+      transform: scaleX(0);
+      transform-origin: top left;
+      transition: transform 0.5s;
+    }
+
+    .loading-bar.ended {
+      transform: scaleX(0);
+      transform-origin: 100% 0;
+      transition: transform 1.5s ease-in-out;
+    }
+
+    .prevent-select {
+      -webkit-user-select: none;
+      /* Safari */
+      -ms-user-select: none;
+      /* IE 10 and IE 11 */
+      user-select: none;
+      /* Standard syntax */
+    }
+
+    p {
+      display: inline;
+    }
+
+    #GM1-hud-text {
+      display: none;
+      position: fixed;
+      padding: 1em;
+      font-family: Arial, Helvetica, sans-serif;
+      color: white;
+      text-shadow: 2px 2px 2px #000000;
+    }
+
+    .game-over {
+      display: none;
+      position: fixed;
+      top: 70%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+
+      font-family: Arial, Helvetica, sans-serif;
+      font-size: xx-large;
+      color: white;
+      text-shadow: 2px 2px 2px #000000;
+      opacity: 0;
+      text-align: center;
+
+      /* border: 1px solid red; */
+    }
+
+    .small-text {
+      font-size: x-large;
+    }
+
+    .center-text {
+      text-align: center;
+    }
+
+    .popup {
+      opacity: 1;
+      top: 60%;
+      display: block;
+      -webkit-animation: fadeIn 1.0s, popUp 1.0s;
+      animation: fadeIn 1.0s, popUp 1.0s;
+    }
+
+    .fadein {
+      opacity: 1;
+      display: block;
+      -webkit-animation: fadeIn 1.0s;
+      animation: fadeIn 1.0s;
+    }
+
+    /* (fade in the popup) */
+    @-webkit-keyframes fadeIn {
+      from {
+        opacity: 0;
+      }
+
+      to {
+        opacity: 1;
+      }
+    }
+
+    @keyframes fadeIn {
+      from {
+        opacity: 0;
+      }
+
+      to {
+        opacity: 1;
+      }
+    }
+
+    /* (fade in the popup) */
+    @-webkit-keyframes fadeOut {
+      from {
+        opacity: 1;
+      }
+
+      to {
+        opacity: 0;
+      }
+    }
+
+    @keyframes fadeOut {
+      from {
+        opacity: 1;
+      }
+
+      to {
+        opacity: 0;
+      }
+    }
+
+    /* (popup the popup) */
+    @-webkit-keyframes popUp {
+      from {
+        top: 70%;
+      }
+
+      to {
+        top: 60%;
+      }
+    }
+
+    @keyframes popUp {
+      from {
+        top: 70%;
+      }
+
+      to {
+        top: 60%;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <canvas class="webgl"></canvas>
+  <div class="loading-bar"></div>
+
+  <div class="prevent-select" id="GM1-hud-text">
+    <h1>
+      Remaining oranges: <p id="GM1-orange-remaining">0</p>
+    </h1>
+    <h1>
+      Score: <p id="GM1-score">0</p>
+    </h1>
+    <h1>
+      Time remaining: <p id="GM1-timer"></p>
+    </h1>
+  </div>
+
+  <div class="prevent-select game-over">
+    <h1>Game Over!</h1>
+    <h1>
+      Final Score: <p id="GM1-final-score"></p>
+    </h1>
+
+    <br />
+    <br />
+    <br />
+    <p class="small-text">(Click anywhere to exit)</p>
+  </div>
+
+  <script defer src="https://ga.jspm.io/npm:es-module-shims@1.6.2/dist/es-module-shims.js"></script>
+  <script type="importmap">
+      {
+        "imports": {
+          "three": "https://unpkg.com/three@0.147.0/build/three.module.js",
+          "cannon-es-debugger": "https://cdn.jsdelivr.net/npm/cannon-es-debugger@1.0.0/dist/cannon-es-debugger.min.js"
+        }
+      }
+    </script>
+  <script type="module">
+    import * as THREE from "three"
+    import * as dat from "https://unpkg.com/lil-gui@0.16.1/dist/lil-gui.esm.js"
+    import { OrbitControls } from "https://unpkg.com/three@0.147.0/examples/jsm/controls/OrbitControls.js"
+
+    import * as CANNON from "https://cdn.jsdelivr.net/npm/cannon-es@0.20.0/dist/cannon-es.min.js"
+    // import CannonDebugger from 'cannon-es-debugger' // currently broken
+
+    import { GLTFLoader } from 'https://unpkg.com/three@0.147.0/examples/jsm/loaders/GLTFLoader.js'
+    import { DRACOLoader } from 'https://unpkg.com/three@0.147.0/examples/jsm/loaders/DRACOLoader.js'
+
+    import * as TWEEN from "https://cdnjs.cloudflare.com/ajax/libs/tween.js/18.6.4/tween.esm.js"
+
+    // import * as DOMPurify from "https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.0.1/purify.min.js"
+
+    /**
+     * Debug
+     */
+    const gui = new dat.GUI()
+    const debugObject = {}
+
+    const pos = 15
+
+    const getRandomIntInclusive = (min, max) => {
+      min = Math.ceil(min);
+      max = Math.floor(max);
+      return Math.floor(Math.random() * (max - min + 1) + min)
+    }
+
+    debugObject.createSphere = () => {
+      createSphere(
+        getRandomIntInclusive(0.5, 5),
+        {
+          x: (Math.random() - .5) * pos,
+          y: pos,
+          z: (Math.random() - .5) * pos
+        }
+      )
+    }
+
+    debugObject.createBox = () => {
+      createBox(
+        getRandomIntInclusive(0.5, 10),
+        getRandomIntInclusive(0.5, 10),
+        getRandomIntInclusive(0.5, 10),
+        {
+          x: (Math.random() - 0.5) * pos,
+          y: pos,
+          z: (Math.random() - 0.5) * pos
+        }
+      )
+    }
+
+    debugObject.removeAllDebugObjects = () => {
+      for (const object of objectsToUpdate) {
+        // Remove body
+        object.body.removeEventListener('collide', playHitSound)
+        world.removeBody(object.body)
+
+        // Remove mesh
+        scene.remove(object.mesh)
+      }
+
+      objectsToUpdate.splice(0, objectsToUpdate.length)
+
+      // foxBody.position.set(0, 1, 0)
+    }
+
+    const objectFolder = gui.addFolder('Objects')
+    objectFolder.add(debugObject, 'createSphere').name('Create sphere')
+    objectFolder.add(debugObject, 'createBox').name('Create box')
+    objectFolder.add(debugObject, 'removeAllDebugObjects').name('Remove all')
+    objectFolder.close()
+
+    /**
+     * Base
+     */
+    // Canvas
+    const canvas = document.querySelector('canvas.webgl')
+
+    // Scene
+    const scene = new THREE.Scene()
+
+    /**
+     * Loading screen and loaders
+     */
+    const loadingOverlayGeometry = new THREE.PlaneGeometry(2, 2, 1, 1)
+    const loadingOverlayMaterial = new THREE.ShaderMaterial({
+      transparent: true,
+      // wireframe: true,
+      uniforms:
+      {
+        uAlpha: { value: 1 }
+      },
+      vertexShader: `
+          void main()
+          {
+              gl_Position = vec4(position, 1.0);
+          }
+      `,
+      fragmentShader: `
+          uniform float uAlpha;
+          void main()
+          {
+              gl_FragColor = vec4(0.0, 0.0, 0.0, uAlpha);
+          }
+      `
+    })
+    const loadingOverlay = new THREE.Mesh(loadingOverlayGeometry, loadingOverlayMaterial)
+    scene.add(loadingOverlay)
+
+    const loadingBarElement = document.querySelector('.loading-bar')
+    const loadingManager = new THREE.LoadingManager(
+      // Loaded
+      () => {
+        window.setTimeout(() => {
+          new TWEEN.Tween(loadingOverlayMaterial.uniforms.uAlpha).to({ value: 0 }, 2000).delay(500).start()
+
+          loadingBarElement.classList.add('ended')
+          loadingBarElement.style.transform = ''
+
+          // unlock W A S D controls
+          isControlLocked = false
+        }, 500)
+      },
+
+      // Progress
+      (itemUrl, itemsLoaded, itemsTotal) => {
+        const progressRatio = itemsLoaded / itemsTotal
+        loadingBarElement.style.transform = `scaleX(${progressRatio})`
+      }
+    )
+
+    // Loaders
+    const textureLoader = new THREE.TextureLoader(loadingManager)
+    const cubeTextureLoader = new THREE.CubeTextureLoader(loadingManager)
+
+    const dracoLoader = new DRACOLoader()
+    dracoLoader.setDecoderPath('./draco/')
+
+    const gltfLoader = new GLTFLoader()
+    gltfLoader.setDRACOLoader(dracoLoader)
+
+    // Environment map
+    const environmentMap = cubeTextureLoader.load([
+      './textures/environmentMaps/px.png',
+      './textures/environmentMaps/nx.png',
+      './textures/environmentMaps/py.png',
+      './textures/environmentMaps/ny.png',
+      './textures/environmentMaps/pz.png',
+      './textures/environmentMaps/nz.png'
+    ])
+    environmentMap.encoding = THREE.sRGBEncoding
+    scene.background = new THREE.Color('skyblue')
+    scene.environment = environmentMap
+
+
+    /**
+     * Game modes
+     */
+    let MODE = 0
+    let clickToResume = false
+
+    // Game-over overlay to darken the scene
+    const gameOverOverlayGeometry = new THREE.PlaneGeometry(2, 2, 1, 1)
+    const gameOverOverlayMaterial = new THREE.ShaderMaterial({
+      transparent: true,
+      uniforms:
+      {
+        uAlpha: { value: 0.0 }
+      },
+      vertexShader: `
+          void main()
+          {
+            gl_Position = vec4(position, 1.0);
+          }
+        `,
+      fragmentShader: `
+          uniform float uAlpha;
+          void main()
+          {
+            gl_FragColor = vec4(0.0, 0.0, 0.0, uAlpha);
+          }
+        `
+    })
+    let gameOverOverlay = null
+
+    const GM1_countdownTime = 15.00
+    const gameModeParams = {
+      MODE1: {
+        // total amount of oranges
+        orangeAmount: 0,
+
+        // list too track oranges in the scene
+        orangeList: [],
+
+        // track score
+        score: 0,
+
+        // timer for gamemode (seconds)
+        countdownTime: GM1_countdownTime,
+        countdownTimer: null,
+
+        // HUD DOM elements
+        HUD_orange_remaining: null,
+        HUD_score: null,
+        HUD_timer: null,
+        HUD_gameover: null,
+        HUD_final_score: null
+      }
+    }
+
+    const resetToDefaultMode = () => {
+      GM1_close()
+
+      MODE = 0
+      toggleFollowModel(false)
+      debugObject.toggleFollowModel = false
+
+      isControlLocked = false
+      clickToResume = false
+      controls.enabled = true
+      controls.reset()
+      camera.position.set(-18, 15, -18)
+
+      foxBody.position.set(0, 1, 0)
+
+      // Clear all debug objects in the scene
+      for (const object of objectsToUpdate) {
+        // Remove body
+        object.body.removeEventListener('collide', playHitSound)
+        world.removeBody(object.body)
+
+        // Remove mesh
+        scene.remove(object.mesh)
+      }
+      objectsToUpdate.splice(0, objectsToUpdate.length)
+
+      spawnRandomObjects()
+    }
+
+    // ============================================================================================
+    // ============================================================================================
+    // ======== GAME MODE 1 ========
+
+    // TODO: a mini gamemode where the fox has to eat all the food within a certain amount of time
+    const GM1_EatEverything = () => {
+      if (MODE == 1) return
+
+      MODE = 1
+      toggleFollowModel(true)
+      // camera.position.set(0, 50, -65)
+
+      // Clear all debug objects in the scene
+      for (const object of objectsToUpdate) {
+        // Remove body
+        object.body.removeEventListener('collide', playHitSound)
+        world.removeBody(object.body)
+
+        // Remove mesh
+        scene.remove(object.mesh)
+      }
+      objectsToUpdate.splice(0, objectsToUpdate.length)
+
+      // HUD
+      document.getElementById('GM1-hud-text').style.display = "block"
+      gameModeParams.MODE1.HUD_score = document.getElementById('GM1-score')
+      gameModeParams.MODE1.HUD_orange_remaining = document.getElementById('GM1-orange-remaining')
+      gameModeParams.MODE1.HUD_timer = document.getElementById('GM1-timer')
+      gameModeParams.MODE1.HUD_gameover = document.getElementsByClassName('game-over')[0]
+
+      gameModeParams.MODE1.HUD_score.innerHTML = gameModeParams.MODE1.score
+      gameModeParams.MODE1.HUD_timer.innerHTML = gameModeParams.MODE1.countdownTime.toFixed(2)
+
+      // Spawn oranges randomly
+      GM1_addOranges(50)
+
+      // Create bounding box for the fox model
+      foxBoundingBox = new THREE.Box3().setFromObject(fox)
+      foxBoundingBox.name = "foxBoundingBox"
+
+      gameModeParams.MODE1.countdownTimer = setInterval(() => {
+        if (gameModeParams.MODE1.countdownTime <= 0) {
+          clearInterval(gameModeParams.MODE1.countdownTimer)
+          gameModeParams.MODE1.countdownTimer = null
+          gameModeParams.MODE1.countdownTime = 0.00
+          GM1_gameOver()
+          return
+        }
+
+        gameModeParams.MODE1.countdownTime -= 0.01
+      }, 10);
+    }
+
+    const GM1_addOranges = (amount) => {
+      if (MODE != 1) return
+
+      const realAmount = amount ? amount : 10
+
+      for (let i = gameModeParams.MODE1.orangeList.length; i < gameModeParams.MODE1.orangeList.length + realAmount; i++) {
+        gltfLoader.load(
+          './models/orange.glb',
+          (gltf) => {
+            const orange = gltf.scene
+
+            orange.children[0].name = 'orangeMesh ' + i
+            orange.children[0].castShadow = true
+            orange.children[0].receiveShadow = true
+
+            orange.position.y += 2
+            orange.position.x = getRandomIntInclusive(-(floorSize.w / 2 - 5), floorSize.w / 2 - 5)
+            orange.position.z = getRandomIntInclusive(-(floorSize.h / 2 - 5), floorSize.h / 2 - 5)
+
+            orange.name = "orangeGroup " + i
+
+            const orangeBoundingBox = new THREE.Box3().setFromObject(orange)
+            orangeBoundingBox.name = "orangeBoundingBox " + i
+            gameModeParams.MODE1.orangeList.push({ orange, orangeBoundingBox })
+            gameModeParams.MODE1.HUD_orange_remaining.innerHTML = gameModeParams.MODE1.orangeList.length
+
+            scene.add(orange)
+          }
+        )
+      }
+
+      gameModeParams.MODE1.orangeAmount += realAmount
+    }
+
+    const GM1_reduceOranges = (amount) => {
+      if (MODE != 1) return
+      if (gameModeParams.MODE1.orangeList.length == 0) return
+
+      let realAmount = amount ? amount : 10
+
+      if (realAmount > gameModeParams.MODE1.orangeList.length || realAmount < 0)
+        realAmount = gameModeParams.MODE1.orangeList.length
+
+      for (let i = 0; i < realAmount; i++) {
+        let orangeRemoved = gameModeParams.MODE1.orangeList.splice(getRandomIntInclusive(0, gameModeParams.MODE1.orangeList.length - 1), 1)[0]
+        scene.remove(orangeRemoved.orange)
+        orangeRemoved.orangeBoundingBox = null
+        gameModeParams.MODE1.HUD_orange_remaining.innerHTML = gameModeParams.MODE1.orangeList.length
+      }
+
+      gameModeParams.MODE1.orangeAmount -= realAmount
+    }
+
+    const GM1_update = () => {
+      if (!fox || !foxBoundingBox) return
+      if (MODE != 1) return
+
+      foxBoundingBox.setFromObject(fox)
+
+      for (let i = 0; i < gameModeParams.MODE1.orangeList.length; i++) {
+        let { orange, orangeBoundingBox } = gameModeParams.MODE1.orangeList[i]
+
+        orangeBoundingBox.setFromObject(orange)
+
+        if (foxBoundingBox.intersectsBox(orangeBoundingBox)) {
+          scene.remove(orange)
+          orangeBoundingBox = null
+
+          gameModeParams.MODE1.orangeList.splice(i, 1)
+
+          gameModeParams.MODE1.score += 1
+
+          eatSound.volume = 0.3
+          eatSound.currentTime = 0
+          eatSound.play()
+
+          gameModeParams.MODE1.HUD_score.innerHTML = gameModeParams.MODE1.score
+          gameModeParams.MODE1.HUD_orange_remaining.innerHTML = gameModeParams.MODE1.orangeList.length
+        }
+      }
+
+      gameModeParams.MODE1.HUD_timer.innerHTML = Math.abs(gameModeParams.MODE1.countdownTime).toFixed(2)
+    }
+
+    const GM1_gameOver = () => {
+      // lock controls (prevent w a s d movement)
+      isControlLocked = true
+      // prevent mouse control
+      if (controls.enabled) controls.enabled = false
+
+      // require user to click to resume
+      clickToResume = true
+
+      // remove hud
+      document.getElementById('GM1-hud-text').style.display = "none"
+
+      // set final score
+      gameModeParams.MODE1.HUD_final_score = document.getElementById('GM1-final-score')
+      gameModeParams.MODE1.HUD_final_score.innerHTML = gameModeParams.MODE1.score
+
+      // fade in dark game over overlay
+      gameOverOverlay = new THREE.Mesh(gameOverOverlayGeometry, gameOverOverlayMaterial)
+      scene.add(gameOverOverlay)
+
+      // TODO: NEED TO FIX THIS, IT WORKS LIKE 10% OF THE TIME FOR SOME REASON
+      new TWEEN.Tween(gameOverOverlayMaterial.uniforms.uAlpha).to({ value: 0.4 }, 1000).start()
+
+      // console.log(gameOverOverlayMaterial.uniforms.uAlpha.value)
+
+      // setTimeout(() => {
+      //   console.log(gameOverOverlayMaterial.uniforms.uAlpha.value)
+      // }, 2000);
+
+      // pop up the game over text overlay
+      gameModeParams.MODE1.HUD_gameover.classList.add('popup')
+    }
+
+    const GM1_close = () => {
+      GM1_reduceOranges(-1)
+      foxBoundingBox = null
+
+      // recover controls
+      isControlLocked = false
+
+      if ((isFollowingModel && isFollowingModelWithMouse) || !isFollowingModel)
+        if (!controls.enabled)
+          controls.enabled = true
+
+      clickToResume = false
+
+      // remove overlay
+      if (gameOverOverlay !== null) {
+        scene.remove(gameOverOverlay)
+      }
+      document.getElementById('GM1-hud-text').style.display = "none"
+      gameOverOverlayMaterial.uniforms.uAlpha.value = 0.0
+
+      // restore HTML element
+      gameModeParams.MODE1.HUD_gameover = document.getElementsByClassName('game-over')[0]
+      gameModeParams.MODE1.HUD_gameover.classList.remove('popup')
+
+      // restore parameters
+      if (gameModeParams.MODE1.countdownTimer !== null) {
+        clearInterval(gameModeParams.MODE1.countdownTimer)
+        gameModeParams.MODE1.countdownTimer = null
+      }
+      gameModeParams.MODE1.countdownTime = GM1_countdownTime
+      gameModeParams.MODE1.orangeAmount = 0
+      gameModeParams.MODE1.score = 0
+    }
+
+    debugObject.resetToDefaultMode = () => { resetToDefaultMode() }
+    debugObject.GM1_EatEverything = () => { GM1_EatEverything() }
+
+    const gameModeFolder = gui.addFolder('Game modes')
+    gameModeFolder.add(debugObject, 'resetToDefaultMode').name("Reset to default mode")
+    gameModeFolder.add(debugObject, 'GM1_EatEverything').name("Start Game Mode 1 (Eat oranges)")
+
+    const gameMode1Folder = gameModeFolder.addFolder('Game mode 1')
+    debugObject.GM1_addOranges = () => { GM1_addOranges() }
+    debugObject.GM1_reduceOranges = () => { GM1_reduceOranges(10) }
+    gameMode1Folder.add(debugObject, 'GM1_addOranges').name("Add more oranges (10)")
+    gameMode1Folder.add(debugObject, 'GM1_reduceOranges').name("Reduce oranges (10)")
+
+    // ======== END OF GAME MODE 1 ========
+    // ============================================================================================
+    // ============================================================================================
+
+
+    canvas.addEventListener("mousedown", (e) => {
+      // console.log(e.button)
+      // left click
+      if (MODE == 1 && clickToResume) {
+        if (e.button === 0) {
+          clickToResume = false
+          resetToDefaultMode()
+        }
+      }
+    })
+
+    // TODO: click to load scene
+    /**
+     * Click to start
+     */
+
+
+    /**
+     * Sounds
+     */
+    const hitSound = new Audio('./sounds/hit.mp3')
+    const eatSound = new Audio('./sounds/eat.mp3')
+
+    // Some browsers like Chrome prevent sounds from playing
+    // unless the user has interacted with the page like clicking
+    // anywhere, so on load you won't hear the first sounds.
+    const playHitSound = (collision) => {
+      const impactStrength = collision.contact.getImpactVelocityAlongNormal()
+
+      if (impactStrength > 1.5) {
+        hitSound.volume = Math.random()
+        hitSound.currentTime = 0
+        hitSound.play()
+      }
+    }
+
+    // TODO: add collision check
+    /**
+     * Collision checking
+     */
+    const checkCollision = (collision) => {
+      const impactStrength = collision.contact.getImpactVelocityAlongNormal()
+
+      if (impactStrength > 1.5) {
+
+      }
+    }
+
+    /**
+     * Physics
+     */
+    // World
+    const world = new CANNON.World()
+
+    // optimize performance by using SAPBroadphase
+    world.broadphase = new CANNON.SAPBroadphase(world)
+
+    // set to Earch gravity
+    world.gravity.set(0, -9.82, 0)
+
+    // optimize performance even more by putting objects to sleep
+    // world.allowSleep = true
+
+    // Default material
+    const defaultMaterial = new CANNON.Material('default')
+    const defaultContactMaterial = new CANNON.ContactMaterial(
+      defaultMaterial,
+      {
+        friction: 0.4,
+        restitution: 0.0
+      }
+    )
+    world.addContactMaterial(defaultContactMaterial)
+    world.defaultContactMaterial = defaultContactMaterial
+
+    // Concrete material
+    const concreteMaterial = new CANNON.Material('concrete')
+    const concreteDefaultContactMaterial = new CANNON.ContactMaterial(
+      concreteMaterial,
+      defaultMaterial,
+      {
+        friction: 0.1,
+        restitution: 0.1
+      }
+    )
+    world.addContactMaterial(concreteDefaultContactMaterial)
+
+    // Fox material
+    const foxMaterial = new CANNON.Material('fox')
+    const foxDefaultContactMaterial = new CANNON.ContactMaterial(
+      foxMaterial,
+      defaultMaterial,
+      {
+        friction: 0.0,
+        restitution: 0.3
+      }
+    )
+    world.addContactMaterial(foxDefaultContactMaterial)
+
+    // Cannon ground
+    const floorSize = { w: 100, h: 100 }
+    const groundBody = new CANNON.Body({
+      type: CANNON.Body.STATIC,
+      shape: new CANNON.Box(new CANNON.Vec3(floorSize.w * 0.5, 0.01, floorSize.h * 0.5)),
+      material: concreteMaterial
+    })
+    world.addBody(groundBody)
+
+    // Cannon debugger
+    // const cannonDebugger = new CannonDebugger(scene, world))
+
+    // TODO: NEED TO FIX HOVERING CANNON BODY
+    // Cannon fox body
+    const foxBody = new CANNON.Body({
+      mass: 100,
+      shape: new CANNON.Box(new CANNON.Vec3(
+        25.185 * 0.025 * 0.5,
+        79.028 * 0.025 * 0.5,
+        154.720 * 0.025 * 0.5)
+      ),
+      position: new CANNON.Vec3(0, 1, 0),
+      material: foxMaterial
+    })
+    foxBody.addEventListener('collide', (e) => {
+      playHitSound(e)
+      checkCollision(e)
+    })
+    world.addBody(foxBody)
+
+    /**
+     * Fox model
+     */
+    let mixer, fox, foxAnims, foxBoundingBox, foxBoundingBoxHelper,
+      currentAction, playingAction,
+      idlingAnim, walkingAnim, runningAnim
+
+    // load fox model and play animation
+    gltfLoader.load(
+      './models/Fox.glb',
+      (gltf) => {
+        mixer = new THREE.AnimationMixer(gltf.scene)
+        fox = gltf.scene
+        foxAnims = gltf.animations
+        idlingAnim = mixer.clipAction(foxAnims[0]) // idling anim
+        walkingAnim = mixer.clipAction(foxAnims[1]) // walking anim
+        runningAnim = mixer.clipAction(foxAnims[2]) // running anim
+
+        // set idling anim as default
+        const action = mixer.clipAction(foxAnims[0])
+        currentAction = action
+        action.play()
+        playingAction = action
+
+        fox.scale.set(.025, .025, .025)
+
+        // enable shadows
+        fox.traverse((object) => {
+          if (object.isMesh) object.castShadow = true;
+        })
+
+        scene.add(fox)
+
+        // foxBoundingBoxHelper = new THREE.BoxHelper(fox, 0xff0000)
+        // scene.add(foxBoundingBoxHelper)
+
+        // get size of fox model
+        // Result: Vector3 { x: 25.185436248779297, y: 79.02893318235874, z: 154.71986389160156 }
+        // const temp = fox.getObjectByName("fox")
+        // let foxSize = new THREE.Vector3()
+        // temp.geometry.boundingBox.getSize(foxSize)
+        // console.log('fox size:', foxSize)
+      }
+    )
+
+    /**
+     * Floor
+     */
+    const floor = new THREE.Mesh(
+      new THREE.PlaneGeometry(floorSize.w, floorSize.h),
+      new THREE.MeshStandardMaterial({
+        color: '#C4A484',
+        metalness: 0.0,
+        roughness: 1.0,
+        envMap: environmentMap,
+        envMapIntensity: 0.5,
+        side: THREE.DoubleSide
+      })
+    )
+    floor.receiveShadow = true
+    floor.rotation.x = -Math.PI * 0.5
+    scene.add(floor)
+
+    /**
+     * Grass
+     * Source: https://discourse.threejs.org/t/simple-instanced-grass-example/26694
+     */
+
+    let grassMesh = null
+    let grassDummy = null
+    let grassGeometry = null
+    let grassMaterial = null
+
+    const grassParams = {
+      amount: 300000,
+      height: 1
+    }
+    debugObject.grassAmount = grassParams.amount
+    debugObject.grassHeight = grassParams.height
+
+    const removeGrass = () => {
+      if (grassMesh) {
+        grassDummy.remove()
+        grassGeometry.dispose()
+        grassMaterial.dispose()
+        scene.remove(grassMesh)
+      }
+    }
+
+    const generateGrass = () => {
+      removeGrass()
+
+      // MATERIALS
+      const vertexShader = `
+        varying vec2 vUv;
+        uniform float time;
+        
+        void main() {
+          vUv = uv;
+          
+          // VERTEX POSITION
+          vec4 mvPosition = vec4( position, 1.0 );
+          #ifdef USE_INSTANCING
+            mvPosition = instanceMatrix * mvPosition;
+          #endif
+          
+          // DISPLACEMENT
+          // here the displacement is made stronger on the blades tips.
+          float dispPower = 1.0 - cos( uv.y * 3.1416 / 2.0 );
+          
+          float displacement = sin( mvPosition.z + time * 10.0 ) * ( 0.1 * dispPower );
+          mvPosition.z += displacement;
+          
+          vec4 modelViewPosition = modelViewMatrix * mvPosition;
+          gl_Position = projectionMatrix * modelViewPosition;
+        }
+      `
+      const fragmentShader = `
+        varying vec2 vUv;
+        
+        void main() {
+          vec3 baseColor = vec3( 0.41, 1.0, 0.5 );
+          float clarity = ( vUv.y * 0.5 ) + 0.5;
+          gl_FragColor = vec4( baseColor * clarity, 1 );
+        }
+      `
+      const uniforms = {
+        time: {
+          value: 0
+        }
+      }
+
+      grassMaterial = new THREE.ShaderMaterial({
+        vertexShader: vertexShader,
+        fragmentShader: fragmentShader,
+        uniforms: uniforms,
+        side: THREE.DoubleSide
+      })
+
+      // MESH
+      grassDummy = new THREE.Object3D()
+      grassGeometry = new THREE.PlaneGeometry(0.1, debugObject.grassHeight, 1, 4)
+
+      // grass height
+      grassGeometry.translate(0, debugObject.grassHeight * 0.5, 0)
+
+      grassMesh = new THREE.InstancedMesh(grassGeometry, grassMaterial, debugObject.grassAmount)
+
+      // grassMesh.receiveShadow = true
+      // grassMesh.castShadow = true
+      scene.add(grassMesh)
+
+      // Position and scale the grass blade instances randomly.
+      for (let i = 0; i < debugObject.grassAmount; i++) {
+        grassDummy.position.set(
+          (Math.random() - 0.5) * floorSize.w, // plane width
+          0,
+          (Math.random() - 0.5) * floorSize.h // plant height
+        );
+
+        grassDummy.scale.setScalar(0.5 + Math.random() * 0.2)
+        grassDummy.rotation.y = Math.random() * Math.PI
+
+        grassDummy.updateMatrix()
+        grassMesh.setMatrixAt(i, grassDummy.matrix)
+      }
+    }
+
+    generateGrass()
+
+    const grassFolder = gui.addFolder('Grass')
+    grassFolder.add(debugObject, 'grassHeight')
+      .min(0.1)
+      .max(5)
+      .step(0.1)
+      .name('Grass height')
+      .onChange(generateGrass)
+
+    grassFolder.add(debugObject, 'grassAmount')
+      .min(0)
+      .max(1000000)
+      .step(100)
+      .name('Grass amount')
+      .onChange(generateGrass)
+    debugObject.removeGrass = () => {
+      removeGrass()
+    }
+    debugObject.generateGrass = () => {
+      generateGrass()
+    }
+    debugObject.resetGrass = () => {
+      debugObject.grassAmount = grassParams.amount
+      debugObject.grassHeight = grassParams.height
+      generateGrass()
+    }
+    grassFolder.add(debugObject, 'removeGrass').name('Remove grass')
+    grassFolder.add(debugObject, 'generateGrass').name('Generate grass')
+    grassFolder.add(debugObject, 'resetGrass').name('Reset grass')
+    grassFolder.close()
+
+    /**
+     * Utils
+     */
+    const objectsToUpdate = []
+    const sphereGeometry = new THREE.SphereGeometry(1, 20, 20)
+    const sphereMaterial = new THREE.MeshStandardMaterial({
+      metalness: .3,
+      roughness: .4,
+      envMap: environmentMap
+    })
+
+    const createSphere = (radius, position, mass, material) => {
+      // Three.js mesh
+      const mesh = new THREE.Mesh(sphereGeometry, sphereMaterial)
+      mesh.scale.set(radius, radius, radius)
+      mesh.castShadow = true
+      mesh.position.copy(position)
+      scene.add(mesh)
+
+      // Cannon.js body
+      const shape = new CANNON.Sphere(radius)
+      const body = new CANNON.Body({
+        mass: 1,
+        position: new CANNON.Vec3(0, 15, 0),
+        shape,
+        material: material
+      })
+      body.position.copy(position)
+      body.addEventListener('collide', playHitSound)
+      world.addBody(body)
+
+      // Save in objects to update
+      objectsToUpdate.push({
+        mesh: mesh,
+        body: body
+      })
+    }
+
+    // Create box
+    const boxGeometry = new THREE.BoxGeometry(1, 1, 1)
+    const boxMaterial = new THREE.MeshStandardMaterial({
+      metalness: 0.3,
+      roughness: 0.4,
+      envMap: environmentMap,
+      envMapIntensity: 0.5
+    })
+
+    const createBox = (width, height, depth, position, mass, material) => {
+      // Three.js mesh
+      const mesh = new THREE.Mesh(boxGeometry, boxMaterial)
+      mesh.scale.set(width, height, depth)
+      mesh.castShadow = true
+      mesh.position.copy(position)
+      scene.add(mesh)
+
+      // Cannon.js body
+      const shape = new CANNON.Box(new CANNON.Vec3(width * 0.5, height * 0.5, depth * 0.5))
+
+      const body = new CANNON.Body({
+        mass: mass ? mass : 1,
+        position: new CANNON.Vec3(0, 3, 0),
+        shape: shape,
+        material: material ? material : defaultMaterial
+      })
+      body.position.copy(position)
+      body.addEventListener('collide', playHitSound)
+      world.addBody(body)
+
+      // Save in objects
+      objectsToUpdate.push({ mesh, body })
+
+      return { mesh, body }
+    }
+
+    const spawnRandomObjects = () => {
+      createBox(5, 1, 1.5, { x: 0, y: 1, z: 10 }, 10)
+      createBox(10, 2, 1.5, { x: 0, y: 2, z: 20 }, 30)
+      createBox(10, 3, 1.5, { x: 0, y: 3, z: 30 }, 60, concreteMaterial)
+      createBox(10, 10, 10, { x: 40, y: 10, z: 40 }, 1000, concreteMaterial)
+
+      createSphere(2, { x: 25, y: 10, z: -20 }, 10)
+      createSphere(3, { x: 25, y: 10, z: -10 }, 30)
+      createSphere(4, { x: 25, y: 10, z: 0 }, 60, concreteMaterial)
+      createSphere(5, { x: 25, y: 10, z: 10 }, 1000, concreteMaterial)
+    }
+    spawnRandomObjects()
+
+
+    /**
+     * Control character
+     * Source code: https://github.com/tamani-coding/threejs-character-controls-example
+     * Code was borrowed and modified
+     */
+    const W = 'w'
+    const A = 'a'
+    const S = 's'
+    const D = 'd'
+    const R = 'r'
+    const SHIFT = 'shift'
+    const SPACE = 'space'
+    const DIRECTIONS = [W, A, S, D]
+
+    const fadeAnimDuration = 0.2
+    debugObject.walkVelocity = 15
+    debugObject.runVelocity = 28
+    debugObject.foxVelocityMultiplier = 1.0
+
+    let isSprinting = false
+    let reset = false
+
+    const followCamHeight = 4
+    const followCamDistance = 6
+    let cameraFollowRotation = 0
+    let toggleLookBehind = false
+
+    let isControlLocked = true
+
+    const walkDirection = new THREE.Vector3()
+    const rotateAngle = new THREE.Vector3(0, 1, 0)
+    // const rotateQuarternion = new THREE.Quaternion()
+    const cameraTarget = new THREE.Vector3()
+
+    // CONTROL KEYS
+    const keysPressed = {}
+
+    document.addEventListener("keydown", () => {
+      // updateCharacter(event.which)
+      if (event.shiftKey && fox) {
+        isSprinting = !isSprinting
+      } else {
+        keysPressed[event.key.toLowerCase()] = true
+      }
+
+      if (event.key.toLowerCase() == 'r') {
+        toggleLookBehind = !toggleLookBehind
+      }
+    }, false)
+
+    document.addEventListener("keyup", () => {
+      keyReleased()
+      keysPressed[event.key.toLowerCase()] = false
+    }, false)
+
+    // reset to idling anim
+    const keyReleased = () => {
+      if (playingAction != idlingAnim) {
+        currentAction.fadeOut(0.5)
+        playingAction = idlingAnim
+        playingAction.reset().fadeIn(0.5).play()
+        currentAction = playingAction
+      }
+    }
+
+    const calculateDirectionOffset = (keysPressed) => {
+      let directionOffset = 0 // s
+
+      if (keysPressed[S]) {
+        if (keysPressed[D]) {
+          directionOffset = Math.PI * 0.25 // s + d
+        } else if (keysPressed[A]) {
+          directionOffset = - Math.PI * 0.25 // s + a
+        }
+      } else if (keysPressed[W]) {
+        if (keysPressed[D]) {
+          directionOffset = Math.PI * 0.25 + Math.PI * 0.5 // w + d
+        } else if (keysPressed[A]) {
+          directionOffset = -Math.PI * 0.25 - Math.PI * 0.5 // w + a
+        } else {
+          directionOffset = Math.PI // w
+        }
+      } else if (keysPressed[D]) {
+        directionOffset = Math.PI * 0.5 // d
+      } else if (keysPressed[A]) {
+        directionOffset = - Math.PI * 0.5 // a
+      }
+
+      return directionOffset
+    }
+
+    const updateCameraTarget = (moveX, moveZ) => {
+      // move camera
+      camera.position.x += moveX
+      camera.position.z += moveZ
+
+      // update camera target
+      cameraTarget.x = foxBody.position.x
+      cameraTarget.y = foxBody.position.y + 1
+      cameraTarget.z = foxBody.position.z
+      controls.target = cameraTarget
+    }
+
+    const updateCharacter = (deltaTime, keysPressed) => {
+      if (!fox || !foxAnims || !mixer) return
+
+      mixer.update(deltaTime)
+
+      if (isControlLocked) return
+
+      let toAction = null
+      const directionPressed = DIRECTIONS.some(key => keysPressed[key] == true)
+
+      if (directionPressed && isSprinting) {
+        toAction = runningAnim
+      } else if (directionPressed) {
+        toAction = walkingAnim
+      } else {
+        toAction = idlingAnim
+      }
+
+      if (toAction && playingAction != toAction) {
+        currentAction.fadeOut(fadeAnimDuration)
+        playingAction = toAction
+        playingAction.reset().fadeIn(fadeAnimDuration).play()
+        currentAction = playingAction
+      }
+
+      if (isFollowingModel) {
+        if (keysPressed[R]) {
+          const rotZ = Math.cos(cameraFollowRotation)
+          const rotX = Math.sin(cameraFollowRotation)
+          if (toggleLookBehind) {
+            camera.position.x = fox.position.x + (followCamDistance * rotX)
+            camera.position.y = fox.position.y + followCamHeight
+            camera.position.z = fox.position.z - (followCamDistance * rotZ)
+          } else {
+            camera.position.x = fox.position.x - (followCamDistance * rotX)
+            camera.position.y = fox.position.y + followCamHeight
+            camera.position.z = fox.position.z + (followCamDistance * rotZ)
+          }
+        }
+      }
+
+      if (currentAction == runningAnim || currentAction == walkingAnim) {
+        // calculate towards camera direction
+        const angleYCameraDirection = Math.atan2(
+          (camera.position.x - foxBody.position.x),
+          (camera.position.z - foxBody.position.z)
+        )
+
+        // diagonal movement angle offset
+        const directionOffset = calculateDirectionOffset(keysPressed)
+
+        // rotate model
+        // rotateQuarternion.setFromAxisAngle(rotateAngle, angleYCameraDirection + directionOffset)
+        // fox.quaternion.rotateTowards(rotateQuarternion, 0.2)
+        foxBody.quaternion.setFromAxisAngle(rotateAngle, angleYCameraDirection + directionOffset)
+
+        // calculate direction
+        camera.getWorldDirection(walkDirection)
+        walkDirection.y = 0
+        walkDirection.normalize()
+        walkDirection.applyAxisAngle(rotateAngle, directionOffset)
+
+        // run / walk velocity
+        const velocity = currentAction == runningAnim ? debugObject.runVelocity * debugObject.foxVelocityMultiplier : debugObject.walkVelocity * debugObject.foxVelocityMultiplier
+
+        // move model & camera
+        const moveX = -walkDirection.x * velocity * deltaTime
+        const moveZ = -walkDirection.z * velocity * deltaTime
+        foxBody.position.x += moveX
+        foxBody.position.z += moveZ
+        updateCameraTarget(moveX, moveZ)
+
+        // rotate camera (in follow model mode)
+        if (isFollowingModel) {
+          if (!isFollowingModelWithMouse) {
+            const rotateAng = Math.PI * 0.5 * deltaTime * debugObject.cameraFollowSensitivity
+
+            if (keysPressed[A]) {
+              cameraFollowRotation -= rotateAng
+            } else if (keysPressed[D]) {
+              cameraFollowRotation += rotateAng
+            }
+            const rotZ = Math.cos(cameraFollowRotation)
+            const rotX = Math.sin(cameraFollowRotation)
+
+            if (toggleLookBehind) {
+              camera.position.x = fox.position.x + (followCamDistance * rotX)
+              camera.position.y = fox.position.y + followCamHeight
+              camera.position.z = fox.position.z - (followCamDistance * rotZ)
+            } else {
+              camera.position.x = fox.position.x - (followCamDistance * rotX)
+              camera.position.y = fox.position.y + followCamHeight
+              camera.position.z = fox.position.z + (followCamDistance * rotZ)
+            }
+          }
+        }
+      }
+    }
+
+    // Fox model debug menu
+    const foxFolder = gui.addFolder('Fox Model')
+
+    debugObject.resetFoxPosition = () => {
+      foxBody.position.set(0, 1, 0)
+    }
+    foxFolder.add(debugObject, 'resetFoxPosition').name('Reset fox position')
+
+    foxFolder.add(debugObject, 'foxVelocityMultiplier')
+      .min(0.1)
+      .max(3.0)
+      .step(0.1)
+      .name('Walking/Running speed')
+
+    foxFolder.close()
+
+    /**
+     * Lights
+     */
+    const ambiLightIntensity = 0.4
+    const hemiLightIntensity = 1.0
+    const dirLightIntensity = 3.0
+
+    const resetLightValues = () => {
+      ambientLight.intensity = ambiLightIntensity
+      hemiLight.intensity = hemiLightIntensity
+      directionalLight.intensity = dirLightIntensity
+    }
+
+    const ambientLight = new THREE.AmbientLight(0xffffff, ambiLightIntensity)
+    scene.add(ambientLight)
+
+    // hemisphere light for natural sunlight
+    const hemiLight = new THREE.HemisphereLight(0xffffff, 0xffffff, hemiLightIntensity)
+    hemiLight.color.setHSL(0.6, 1, 0.6)
+    hemiLight.groundColor.setHSL(0.095, 1, 0.75)
+    hemiLight.position.set(0, 10, 0)
+    scene.add(hemiLight)
+
+    // const hemiLightHelper = new THREE.HemisphereLightHelper(hemiLight, 1)
+    // scene.add(hemiLightHelper)
+
+    const directionalLight = new THREE.DirectionalLight(0xffffff, dirLightIntensity)
+    directionalLight.castShadow = true
+    directionalLight.shadow.mapSize.set(1024, 1024)
+    directionalLight.shadow.camera.near = 20
+    directionalLight.shadow.camera.far = 100
+
+    const d = 50
+    directionalLight.shadow.camera.left = -d
+    directionalLight.shadow.camera.top = d
+    directionalLight.shadow.camera.right = d
+    directionalLight.shadow.camera.bottom = -d
+    directionalLight.position.set(0, 35, 50)
+    scene.add(directionalLight)
+
+    // const directionalLightHelper = new THREE.DirectionalLightHelper(directionalLight, 10)
+    // scene.add(directionalLightHelper)
+
+    /**
+     * Sizes
+     */
+    const sizes = {
+      width: window.innerWidth,
+      height: window.innerHeight
+    }
+
+    window.addEventListener('resize', () => {
+      // Update sizes
+      sizes.width = window.innerWidth
+      sizes.height = window.innerHeight
+
+      // Update camera
+      camera.aspect = sizes.width / sizes.height
+      camera.updateProjectionMatrix()
+
+      // Update renderer
+      renderer.setSize(sizes.width, sizes.height)
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
+    })
+
+    /**
+     * Camera
+     */
+    // Base camera
+    const camera = new THREE.PerspectiveCamera(75, sizes.width / sizes.height, 0.1, 500)
+    camera.position.set(-18, 15, -18)
+    scene.add(camera)
+
+    // Controls
+    const controls = new OrbitControls(camera, canvas)
+    controls.enableDamping = true
+
+    let isFollowingModel = false
+
+    const toggleFollowModel = (bool) => {
+      if (bool) {
+        isFollowingModel = true
+        debugObject.toggleFollowModel = true
+
+        if (!isFollowingModelWithMouse)
+          controls.enabled = false
+
+        if (fox) {
+          if (toggleLookBehind) {
+            camera.position.x = fox.position.x + (followCamDistance)
+            camera.position.y = fox.position.y + followCamHeight
+            camera.position.z = fox.position.z - (followCamDistance)
+          } else {
+            camera.position.x = fox.position.x - (followCamDistance)
+            camera.position.y = fox.position.y + followCamHeight
+            camera.position.z = fox.position.z + (followCamDistance)
+          }
+        }
+      } else {
+        isFollowingModel = false
+        debugObject.toggleFollowModel = false
+
+        controls.reset()
+        controls.enabled = true
+
+        // update camera target
+        cameraTarget.x = foxBody.position.x
+        cameraTarget.y = foxBody.position.y + 1
+        cameraTarget.z = foxBody.position.z
+        controls.target = cameraTarget
+      }
+    }
+
+    let isFollowingModelWithMouse = false
+
+    const toggleFollowModelMouseMode = (bool) => {
+      isFollowingModelWithMouse = bool
+      controls.enabled = bool
+
+      if (!isFollowingModel) {
+        if (!controls.enabled)
+          controls.enabled = true
+      }
+    }
+
+    // Camera debug menu
+    const cameraFolder = gui.addFolder('Camera')
+
+    debugObject.toggleFollowModel = false
+    cameraFolder.add(debugObject, 'toggleFollowModel')
+      .onChange((value) => { toggleFollowModel(value) })
+      .name('Toggle follow model')
+      .listen()
+
+    debugObject.toggleFollowModelMouseMode = false
+    cameraFolder.add(debugObject, 'toggleFollowModelMouseMode')
+      .onChange((value) => { toggleFollowModelMouseMode(value) })
+      .name('Toggle mouse mode (in follow mode)')
+
+    debugObject.cameraFollowSensitivity = 1.5
+    cameraFolder.add(debugObject, 'cameraFollowSensitivity')
+      .min(0.1)
+      .max(5.0)
+      .step(0.1)
+      .name('Follow rotation sensitivity')
+
+    /**
+     * Renderer
+     */
+    const renderer = new THREE.WebGLRenderer({
+      canvas: canvas,
+      antialias: true
+    })
+    renderer.setSize(sizes.width, sizes.height)
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
+    renderer.shadowMap.enabled = true
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap
+    renderer.physicallyCorrectLights = true
+    renderer.outputEncoding = THREE.sRGBEncoding
+
+    // Tone Mapping
+    const toneMappingExposure = 1
+    renderer.toneMapping = THREE.ACESFilmicToneMapping
+    renderer.toneMappingExposure = toneMappingExposure
+
+    /**
+     * Animate
+     */
+    const clock = new THREE.Clock()
+    let oldElapsedTime = 0
+
+    const tick = () => {
+      const elapsedTime = clock.getElapsedTime()
+      const deltaTime = elapsedTime - oldElapsedTime
+      oldElapsedTime = elapsedTime
+
+      // Update physics
+      world.step(1 / 120, deltaTime, 3)
+      for (const obj of objectsToUpdate) {
+        obj.mesh.position.copy(obj.body.position)
+        obj.mesh.quaternion.copy(obj.body.quaternion)
+      }
+
+      if (fox) {
+        fox.position.copy(foxBody.position)
+        fox.quaternion.copy(foxBody.quaternion)
+
+        if (isFollowingModel) {
+          cameraTarget.x = foxBody.position.x
+          cameraTarget.y = foxBody.position.y + 1
+          cameraTarget.z = foxBody.position.z
+          controls.target = cameraTarget
+        }
+      }
+
+      // Animate grass
+      if (grassMaterial) {
+        grassMaterial.uniforms.time.value = clock.getElapsedTime() * 0.3
+        grassMaterial.uniformsNeedUpdate = true
+      }
+
+      updateCharacter(deltaTime, keysPressed)
+      if (foxBoundingBoxHelper) foxBoundingBoxHelper.update()
+
+      if (MODE == 1) {
+        GM1_update()
+
+        // move orange up and down slightly
+        gameModeParams.MODE1.orangeList.forEach(object => {
+          object.orange.position.y = 1.5 + Math.sin(elapsedTime * 2.5) * 0.25
+        })
+      }
+
+      // Update controls
+      controls.update()
+
+      // Update tween
+      TWEEN.update()
+
+      // Render
+      renderer.render(scene, camera)
+
+      // Call tick again on the next frame
+      window.requestAnimationFrame(tick)
+    }
+
+    tick()
+  </script>
+</body>
+
+</html>
